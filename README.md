@@ -11,6 +11,7 @@
     <a href="https://github.com/StarfireLab/SharpWeb"><img alt="Forks" src="https://img.shields.io/github/forks/StarfireLab/SharpWeb"></a>
   <a href="https://github.com/StarfireLab/SharpWeb"><img alt="Stars" src="https://img.shields.io/github/stars/StarfireLab/SharpWeb.svg?style=social&label=Stars"></a>
      <a href="https://github.com/lele8"><img alt="Visitor" src="https://visitor-badge.laobi.icu/badge?page_id=StarfireLab.SharpWeb"></a>
+
 ## 浏览器支持情况
 
 | 浏览器                | 密码  | Cookie | 书签  | 历史记录 |
