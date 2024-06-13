@@ -2,7 +2,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.IO;
-using System.Diagnostics;
 using System.Collections.Generic;
 using static SharpWeb.Browsers.GetKey;
 using SharpWeb.Utilities;
@@ -19,9 +18,10 @@ namespace SharpWeb.Browsers
         {
             try
             {
-                List<string[]> history_data = new List<string[]> { new string[] { "URL", "TITLE", "AccessDate" } };
-                string histroy_fileName = Path.Combine("out", browser_name + "_history.csv");
+                string[] header = new string[] { "URL", "TITLE", "AccessDate" };
+                List<string[]> data = new List<string[]> { };
 
+                string fileName = Path.Combine("out", browser_name + "_history");
                 string History_tempFile = CreateTmpFile(chrome_History_path);
 
                 SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", History_tempFile));
@@ -41,18 +41,19 @@ namespace SharpWeb.Browsers
                     PrintSuccess(String.Format("URL: {0}", name), 1);
                     PrintSuccess(String.Format("TITLE: {0}", value), 1);
                     PrintSuccess(String.Format("AccessDate: {0}", TypeUtil.TimeEpoch(lastDate)), 1);
-                    history_data.Add(new string[] { name, value, TypeUtil.TimeEpoch(lastDate).ToString() });
+                    data.Add(new string[] { name, value, TypeUtil.TimeEpoch(lastDate).ToString() });
                 }
                 con.Close();
-                WriteCSV(history_data, histroy_fileName);
+                if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                    WriteJson(header, data, fileName);
+                else
+                    WriteCSV(header, data, fileName);
                 File.Delete(History_tempFile);
             }
             catch
             {
                 PrintFail(String.Format("{0} Not Found!", chrome_History_path), 1);
             }
-
-
             Console.WriteLine();
         }
 
@@ -64,8 +65,10 @@ namespace SharpWeb.Browsers
             {
                 string Download_tempFile = CreateTmpFile(chrome_Download_path);
 
-                List<string[]> Download_data = new List<string[]> { new string[] { "URL", "PATH", "TIME" } };
-                string Down_fileName = Path.Combine("out", browser_name + "_download.csv");
+                string[] header = new string[] { "URL", "PATH", "TIME" };
+                List<string[]> data = new List<string[]> { };
+
+                string fileName = Path.Combine("out", browser_name + "_download");
 
                 SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", Download_tempFile));
                 con.Open();
@@ -84,12 +87,14 @@ namespace SharpWeb.Browsers
                     PrintSuccess(String.Format("URL: {0}", url), 1);
                     PrintSuccess(String.Format("PATH: {0}", path), 1);
                     PrintSuccess(String.Format("AccessDate: {0}", TypeUtil.TimeEpoch(lastDate)), 1);
-                    Download_data.Add(new string[] { url, path, TypeUtil.TimeEpoch(lastDate).ToString() });
+                    data.Add(new string[] { url, path, TypeUtil.TimeEpoch(lastDate).ToString() });
                 }
                 con.Close();
-                WriteCSV(Download_data, Down_fileName);
+                if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                    WriteJson(header, data, fileName);
+                else
+                    WriteCSV(header, data, fileName);
                 File.Delete(Download_tempFile);
-
             }
             catch
             {
@@ -103,15 +108,17 @@ namespace SharpWeb.Browsers
         {
             try
             {
-                string cookie_tempFile = CreateTmpFile(chrome_cookie_path);
+                string cookie_data_tempFile = CreateTmpFile(chrome_cookie_path);
+                string[] Jsonheader = new string[] { "domain", "expirationDate", "hostOnly", "httpOnly", "name", "path", "sameSite", "secure", "session", "storeId", "value" };
+                List<string[]> Jsondata = new List<string[]> { };
 
-                List<string[]> cookie_data = new List<string[]> { new string[] { "HOST", "COOKIE", "Path", "IsSecure", "Is_httponly", "HasExpire", "IsPersistent", "CreateDate", "ExpireDate", "AccessDate" } };
-                string cookie_fileName = Path.Combine("out", browser_name + "_cookie.csv");
+                string[] header = new string[] { "HOST", "COOKIE", "Path", "IsSecure", "Is_httponly", "HasExpire", "IsPersistent", "CreateDate", "ExpireDate", "AccessDate" };
+                List<string[]> data = new List<string[]> { };
 
-
-                SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", cookie_tempFile));
+                string fileName = Path.Combine("out", browser_name + "_cookie");
+                SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", cookie_data_tempFile));
                 con.Open();
-                SqliteCommand query = new SqliteCommand("SELECT cast(creation_utc as text) as creation_utc, host_key, name, path, cast(expires_utc as text) as expires_utc, cast(last_access_utc as text) as last_access_utc, encrypted_value, is_secure, is_httponly,has_expires,is_persistent FROM cookies", con);
+                SqliteCommand query = new SqliteCommand("SELECT cast(creation_utc as text) as creation_utc, host_key, name, path, cast(expires_utc as text) as expires_utc, cast(last_access_utc as text) as last_access_utc, encrypted_value, is_secure, is_httponly,has_expires,is_persistent,samesite FROM cookies", con);
                 SqliteDataReader reader = query.ExecuteReader();
                 while (reader.Read())
                 {
@@ -133,6 +140,11 @@ namespace SharpWeb.Browsers
                     long creDate;
                     Int64.TryParse(reader.GetValue(0).ToString(), out creDate);
 
+                    int sameSite = -1;
+                    int.TryParse(reader.GetValue(11).ToString(), out sameSite);
+
+                    string sameSiteString = TryParsesameSite(reader.GetValue(11).ToString());
+
                     string path = reader.GetValue(3).ToString();
                     try
                     {
@@ -151,16 +163,21 @@ namespace SharpWeb.Browsers
                     PrintSuccess(String.Format("AccessDate: {0}", TypeUtil.TimeEpoch(lastDate)), 1);
                     PrintSuccess(String.Format("Path: {0}", path), 1);
                     string cookie = String.Format("{0}={1}", name, cookie_value);
-                    cookie_data.Add(new string[] { host_key, cookie, path, IsSecure, http_only, HasExpire, IsPersistent, TypeUtil.TimeEpoch(creDate).ToString(), TypeUtil.TimeEpoch(expDate).ToString(), TypeUtil.TimeEpoch(lastDate).ToString() });
+
+                    Jsondata.Add(new string[] { host_key, expDate.ToString(), "false", http_only, name, path, sameSiteString, IsSecure, "true", "0", cookie_value });
+                    data.Add(new string[] { host_key, cookie, path, IsSecure, http_only, HasExpire, IsPersistent, TypeUtil.TimeEpoch(creDate).ToString(), TypeUtil.TimeEpoch(expDate).ToString(), TypeUtil.TimeEpoch(lastDate).ToString() });
                 }
                 con.Close();
-                WriteCSV(cookie_data, cookie_fileName);
-                File.Delete(cookie_tempFile);
-
+                
+                if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                    WriteJson(Jsonheader, Jsondata, fileName);
+                else
+                    WriteCSV(header, data, fileName);
+                File.Delete(cookie_data_tempFile);
             }
             catch
             {
-                PrintFail("Cookies File Not Found OR Browser is running!", 1);
+                PrintFail("Cookies File Not Found OR Not Administrator Privileges!", 1);
             }
             Console.WriteLine();
         }
@@ -185,8 +202,11 @@ namespace SharpWeb.Browsers
             {
                 string login_data_tempFile = CreateTmpFile(login_data_path);
 
-                List<string[]> data = new List<string[]> { new string[] { "URL", "USERNAME", "PASSWORD", "CreateDate" } };
-                string fileName = Path.Combine("out", browser_name + "_password.csv");
+                
+                string[] header = new string[] { "URL", "USERNAME", "PASSWORD", "CreateDate" };
+
+                List<string[]> data = new List<string[]> { };
+                string fileName = Path.Combine("out", browser_name + "_password");
 
                 SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", login_data_tempFile));
                 con.Open();
@@ -219,8 +239,11 @@ namespace SharpWeb.Browsers
                     PrintSuccess(String.Format("{0}: {1}", "CreateDate", TypeUtil.TimeEpoch(creDate).ToString()), 1);
                 }
                 con.Close();
+                if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                    WriteJson(header, data, fileName);
+                else
+                    WriteCSV(header, data, fileName);
                 File.Delete(login_data_tempFile);
-                WriteCSV(data, fileName);
             }
             catch
             {

@@ -21,7 +21,6 @@
 | Chromium           |  ✅  |   ✅    |  ✅  |  ✅   |
 | Microsoft Edge     |  ✅  |   ✅    |  ✅  |  ✅   |
 | 360 极速浏览器          |  ✅  |   ✅    |  ✅  |  ✅   |
-| 360 极速浏览器X | ✅ | ✅ | ✅ | ✅ |
 | QQ                 |  ✅  |   ✅    |  ✅  |  ✅   |
 | Brave              |  ✅  |   ✅    |  ✅  |  ✅   |
 | Opera              |  ✅  |   ✅    |  ✅  |  ✅   |
@@ -55,25 +54,27 @@ By @lele8
 
   -all           Obtain all browser data
   -b             Available browsers: chromium/firefox/ie
-  -p             Custom profile dir path, get with chrome://version
+  -p             Custom profile dir path or the path of Cookies
+  -s             Specify the path of Local State
   -show          Output the results on the command line
   -zip           Compress result to zip (default: false)
+  -format        Export to CSV (default) or JSON format
 
   Usage:
        SharpWeb.exe -all
        SharpWeb.exe -all -zip
        SharpWeb.exe -all -show
+       SharpWeb.exe -all -format json
        SharpWeb.exe -b firefox
        SharpWeb.exe -b chromium -p "C:\Users\test\AppData\Local\Google\Chrome\User Data\Default"
+       SharpWeb.exe -b chromium -p "C:\Users\test\AppData\Local\Google\Chrome\User Data\Default\Network\Cookies" -s "C:\Users\test\AppData\Local\Google\Chrome\User Data\Local State"
 ```
 
-## 待更新
+## 新增功能
 
-1.cookie导出json格式，支持一键导入EditThisCookie插件
+1.支持cookie导出json格式，可一键导入EditThisCookie插件
 
-2.使用域备份密钥解密，并支持解密域机器上的浏览器数据
-
-3.Cookies文件占用问题，未解决，可使用RawCopy.exe作为临时解决方法
+2.指定基于Chromium内核的浏览器导出Cookie
 
 ## 免责声明
 

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Web.Script.Serialization;
 using static SharpWeb.Display.OutputFormatting;
@@ -55,7 +56,8 @@ namespace SharpWeb.Utilities
 
         public static void Treat(string path)
         {
-            List<string[]> data = new List<string[]> { new string[] { "NAME", "URL" } };
+            string[] header = new string[] { "NAME", "URL" };
+            List<string[]> data = new List<string[]> { };
 
             JavaScriptSerializer serializer = new JavaScriptSerializer();
 
@@ -66,8 +68,11 @@ namespace SharpWeb.Utilities
             {
                 TraverseFolders(root.Value.children, 1, data);
             }
-            string fileName = Path.Combine("out", browser_name + "_bookmark.csv");
-            WriteCSV(data, fileName);
+            string fileName = Path.Combine("out", browser_name + "_bookmark");
+            if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                WriteJson(header, data, fileName);
+            else
+                WriteCSV(header, data, fileName);
         }
 
     }

@@ -10,6 +10,7 @@ namespace SharpWeb
     class Program
     {
         public static bool aZip = false, Show = false, All = false;
+        public static string format = string.Empty;
 
         public static void Banner()
         {
@@ -29,6 +30,7 @@ namespace SharpWeb
             Banner();
             string argBrowsers = "";
             string argPath = "";
+            string argState = "";
             foreach (var entry in args.Select((value, index) => new { index, value }))
             {
                 string argument = entry.value.ToUpper();
@@ -43,6 +45,10 @@ namespace SharpWeb
                     case "/P":
                         argPath = args[entry.index + 1];
                         break;
+                    case "-S":
+                    case "/S":
+                        argState = args[entry.index + 1];
+                        break;
                     case "-ZIP":
                     case "/ZIP":
                         aZip = true;
@@ -55,6 +61,10 @@ namespace SharpWeb
                     case "/ALL":
                         All = true;
                         break;
+                    case "-FORMAT":
+                    case "/FORMAT":
+                        format = args[entry.index + 1];
+                        break;
                 }
             }
 
@@ -65,28 +75,45 @@ By @lele8
 
   -all           Obtain all browser data
   -b             Available browsers: chromium/firefox/ie
-  -p             Custom profile dir path, get with chrome://version
+  -p             Custom profile dir path or the path of Cookies
+  -s             Specify the path of Local State
   -show          Output the results on the command line
   -zip           Compress result to zip (default: false)
+  -format        Export to CSV (default) or JSON format
 
   Usage: 
        SharpWeb.exe -all
        SharpWeb.exe -all -zip
        SharpWeb.exe -all -show
+       SharpWeb.exe -all -format json
        SharpWeb.exe -b firefox
        SharpWeb.exe -b chromium -p ""C:\Users\test\AppData\Local\Google\Chrome\User Data\Default""
+       SharpWeb.exe -b chromium -p ""C:\Users\test\AppData\Local\Google\Chrome\User Data\Default\Network\Cookies"" -s ""C:\Users\test\AppData\Local\Google\Chrome\User Data\Local State""
 ");
             }
             else if (!string.IsNullOrEmpty(argBrowsers))
             {
-                if (argBrowsers.Equals("chromium", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(argPath))
-                    Specify_path(argBrowsers, argPath);
-                else if (argBrowsers.Equals("firefox", StringComparison.OrdinalIgnoreCase))
-                    GetFireFox();
-                else if(argBrowsers.Equals("chromium", StringComparison.OrdinalIgnoreCase))
-                    Chromium_kernel();
-                else if (argBrowsers.Equals("ie", StringComparison.OrdinalIgnoreCase))
-                    GetIE();
+                switch (argBrowsers.ToLowerInvariant())
+                {
+                    case "chromium" when !string.IsNullOrEmpty(argPath) && !string.IsNullOrEmpty(argState):
+                        browser_name = "chromium";
+                        Cookies(argPath, argState);
+                        break;
+                    case "chromium" when !string.IsNullOrEmpty(argPath):
+                        Specify_path(argBrowsers, argPath);
+                        break;
+                    case "firefox":
+                        GetFireFox();
+                        break;
+                    case "chromium":
+                        Chromium_kernel();
+                        break;
+                    case "ie":
+                        GetIE();
+                        break;
+                    default:
+                        break;
+                }
             }
             else if (All)
             {
@@ -98,5 +125,4 @@ By @lele8
                 Zip.saveZip();
         }
     }
-
 }

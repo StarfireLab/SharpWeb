@@ -171,8 +171,9 @@ namespace SharpWeb.Browsers
                 bool flag = File.Exists(userFireFoxdbPath) && File.Exists(userFireFoxloginPath);
                 if (flag)
                 {
-                    List<string[]> data = new List<string[]> { new string[] { "URL", "USERNAME", "PASSWORD" } };
-                    string fileName = Path.Combine("out", "FireFox_password.csv");
+                    string[] header = new string[] { "URL", "USERNAME", "PASSWORD" };
+                    List<string[]> data = new List<string[]> { };
+                    string fileName = Path.Combine("out", "FireFox_password");
 
 
                     string userFireFoxdbPath_tempFile = Path.GetTempFileName();
@@ -234,7 +235,10 @@ namespace SharpWeb.Browsers
                     }
                     File.Delete(userFireFoxdbPath_tempFile);
                     File.Delete(userFireFoxloginPath_tempFile);
-                    WriteCSV(data, fileName);
+                    if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                        WriteJson(header, data, fileName);
+                    else
+                        WriteCSV(header, data, fileName);
                 }
             }
             catch
@@ -252,15 +256,19 @@ namespace SharpWeb.Browsers
 
                 string patchedcookieDB = PatchWALDatabase(cookies_tempFile);
 
+                string[] Jsonheader = new string[] { "domain", "expirationDate", "hostOnly", "httpOnly", "name", "path", "sameSite", "secure", "session", "storeId", "value" };
+                List<string[]> Jsondata = new List<string[]> { };
 
-                List<string[]> cookie_data = new List<string[]> { new string[] { "HOST", "COOKIE", "Path", "IsSecure", "Is_httponly", "CreateDate", "ExpireDate" } };
-                string cookie_fileName = Path.Combine("out", "FireFox_cookie.csv");
+                string[] header = new string[] { "HOST", "COOKIE", "Path", "IsSecure", "Is_httponly", "CreateDate", "ExpireDate" };
+                List<string[]> data = new List<string[]> { };
+
+                string fileName = Path.Combine("out", "FireFox_cookie");
 
                 SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", patchedcookieDB));
                 con.Open();
                 SqliteCommand drop = new SqliteCommand("DROP TABLE IF EXISTS moz_previews_tombstones;", con);
                 drop.ExecuteNonQuery();
-                SqliteCommand query = new SqliteCommand("SELECT name,value,host,path,creationTime,expiry,lastAccessed,isSecure,isHttpOnly FROM moz_cookies", con);
+                SqliteCommand query = new SqliteCommand("SELECT name,value,host,path,creationTime,expiry,lastAccessed,isSecure,isHttpOnly,samesite FROM moz_cookies", con);
                 SqliteDataReader reader = query.ExecuteReader();
                 while (reader.Read())
                 {
@@ -275,8 +283,12 @@ namespace SharpWeb.Browsers
                     string expiry = TypeUtil.TimeStamp(long.Parse(reader.GetValue(5).ToString())).ToString();
                     string isSecure = is_true_false(reader.GetValue(7).ToString());
                     string isHttpOnly = is_true_false(reader.GetValue(8).ToString());
+                    string sameSiteString = TryParsesameSite(reader.GetValue(9).ToString());
                     string cookie = String.Format("{0}={1}", name, value);
-                    cookie_data.Add(new string[] { host, cookie, path, isSecure, isHttpOnly, creationTime, expiry });
+
+                    data.Add(new string[] { host, cookie, path, isSecure, isHttpOnly, creationTime, expiry });
+                    Jsondata.Add(new string[] { host, reader.GetValue(5).ToString(), "false", isHttpOnly, name, path, sameSiteString, isSecure, "true", "0", value });
+
                     PrintSuccess(String.Format("HOST: {0}", host), 1);
                     PrintSuccess(String.Format("COOKIE: {0}={1},path={2}", name, value, path), 1);
                     PrintSuccess(String.Format("CreateDate: {0}", creationTime), 1);
@@ -285,7 +297,10 @@ namespace SharpWeb.Browsers
                 }
                 con.Close();
                 File.Delete(cookies_tempFile);
-                WriteCSV(cookie_data, cookie_fileName);
+                if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                    WriteJson(Jsonheader, Jsondata, fileName);
+                else
+                    WriteCSV(header, data, fileName);
             }
             catch
             {
@@ -300,12 +315,15 @@ namespace SharpWeb.Browsers
             try
             {
                 string places_tempFile = CreateTmpFile(places_path);
-                
+
                 string patchedhistroyDB = PatchWALDatabase(places_tempFile);
 
                 PrintVerbose("Get Firefox Historys");
-                List<string[]> history_data = new List<string[]> { new string[] { "URL", "TITLE" ,"TIME"} };
-                string histroy_fileName = Path.Combine("out", "FireFox_history.csv");
+
+                string[] header = new string[] { "URL", "TITLE", "TIME" };
+                List<string[]> data = new List<string[]> { };
+
+                string fileName = Path.Combine("out", "FireFox_history");
 
                 SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", patchedhistroyDB));
                 con.Open();
@@ -325,15 +343,18 @@ namespace SharpWeb.Browsers
                     PrintSuccess(String.Format("URL: {0}", url), 1);
                     PrintSuccess(String.Format("TITLE: {0}", title), 1);
                     PrintSuccess(String.Format("TIME: {0}", creationTime), 1);
-                    history_data.Add(new string[] { url, title, creationTime });
+                    data.Add(new string[] { url, title, creationTime });
                 }
                 con.Close();
                 File.Delete(places_tempFile);
-                WriteCSV(history_data, histroy_fileName);
+                if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                    WriteJson(header, data, fileName);
+                else
+                    WriteCSV(header, data, fileName);
             }
             catch
             {
-               PrintFail(String.Format("{0} Not Found!", places_path), 1);
+                PrintFail(String.Format("{0} Not Found!", places_path), 1);
             }
             Console.WriteLine();
         }
@@ -347,8 +368,11 @@ namespace SharpWeb.Browsers
                 string patcheddownloadDB = PatchWALDatabase(places_tempFile);
 
                 PrintVerbose("Get Firefox Downloads");
-                List<string[]> Download_data = new List<string[]> { new string[] { "URL", "PATH","TIME" } };
-                string download_fileName = Path.Combine("out", "FireFox_download.csv");
+
+                string[] header = new string[] { "URL", "PATH", "TIME" };
+                List<string[]> data = new List<string[]> { };
+
+                string fileName = Path.Combine("out", "FireFox_download");
 
                 SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", patcheddownloadDB));
                 con.Open();
@@ -365,11 +389,14 @@ namespace SharpWeb.Browsers
                     PrintSuccess(String.Format("URL: {0}", url), 1);
                     PrintSuccess(String.Format("PATH: {0}", path), 1);
                     PrintSuccess(String.Format("TIME: {0}", creationTime), 1);
-                    Download_data.Add(new string[] { url,path,creationTime });
+                    data.Add(new string[] { url, path, creationTime });
                 }
                 con.Close();
                 File.Delete(places_tempFile);
-                WriteCSV(Download_data, download_fileName);
+                if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                    WriteJson(header, data, fileName);
+                else
+                    WriteCSV(header, data, fileName);
             }
             catch
             {
@@ -388,8 +415,11 @@ namespace SharpWeb.Browsers
                 string patchedbookmarksDB = PatchWALDatabase(places_tempFile);
 
                 PrintVerbose("Get Firefox Bookmarks");
-                List<string[]> Bookmark_data = new List<string[]> { new string[] { "URL", "TITLE", "TIME" } };
-                string bookmark_fileName = Path.Combine("out", "FireFox_bookmark.csv");
+
+                string[] header = new string[] { "URL", "TITLE", "TIME" };
+                List<string[]> data = new List<string[]> { };
+
+                string fileName = Path.Combine("out", "FireFox_bookmark");
 
                 SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", patchedbookmarksDB));
                 con.Open();
@@ -399,7 +429,7 @@ namespace SharpWeb.Browsers
                 SqliteDataReader reader = query.ExecuteReader();
                 while (reader.Read())
                 {
-                    
+
                     string url = reader.GetValue(0).ToString();
                     string title = reader.GetValue(2).ToString();
                     string creationTime = TypeUtil.TimeStamp(long.Parse(reader.GetValue(1).ToString()) / 1000000).ToString();
@@ -407,11 +437,14 @@ namespace SharpWeb.Browsers
                     PrintSuccess(String.Format("URL: {0}", url), 1);
                     PrintSuccess(String.Format("TITLE: {0}", title), 1);
                     PrintSuccess(String.Format("TIME: {0}", creationTime), 1);
-                    Bookmark_data.Add(new string[] { url, title, creationTime });
+                    data.Add(new string[] { url, title, creationTime });
                 }
                 con.Close();
                 File.Delete(places_tempFile);
-                WriteCSV(Bookmark_data, bookmark_fileName);
+                if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                    WriteJson(header, data, fileName);
+                else
+                    WriteCSV(header, data, fileName);
             }
             catch
             {

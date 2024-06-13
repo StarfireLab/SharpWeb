@@ -15,35 +15,44 @@ namespace SharpWeb.Browsers
     {
         public static void IE_history()
         {
-            PrintVerbose("Get IE history");
-
-            List<string[]> data = new List<string[]> { new string[] { "URL"} };
-            string fileName = Path.Combine("out", "IE_history.csv");
-
-            RegistryKey Key = Registry.CurrentUser;
-            RegistryKey myreg = Key.OpenSubKey("Software\\Microsoft\\Internet Explorer\\TypedURLs");
-            string[] urls = new string[26];
-
-            for (int i = 1; i < 26; i++)
+            try
             {
-                try
-                {
-                    string info = myreg.GetValue("url" + i.ToString()).ToString();
+                PrintVerbose("Get IE history");
 
-                    urls[i] = info;
-                }
-                catch { }
-            }
-            foreach (string url in urls)
-            {
-                if (url != null)
-                {
-                    PrintSuccess(url,1);
-                    data.Add(new string[] { url });
-                }
+                string[] header = new string[] { "URL" };
+                List<string[]> data = new List<string[]> { };
 
+                string fileName = Path.Combine("out", "IE_history");
+
+                RegistryKey Key = Registry.CurrentUser;
+                RegistryKey myreg = Key.OpenSubKey("Software\\Microsoft\\Internet Explorer\\TypedURLs");
+                string[] urls = new string[26];
+
+                for (int i = 1; i < 26; i++)
+                {
+                    try
+                    {
+                        string info = myreg.GetValue("url" + i.ToString()).ToString();
+
+                        urls[i] = info;
+                    }
+                    catch { }
+                }
+                foreach (string url in urls)
+                {
+                    if (url != null)
+                    {
+                        PrintSuccess(url, 1);
+                        data.Add(new string[] { url });
+                    }
+
+                }
+                if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                    WriteJson(header, data, fileName);
+                else
+                    WriteCSV(header, data, fileName);
             }
-            WriteCSV(data, fileName);
+            catch { }
             Console.WriteLine();
         }
 
@@ -53,24 +62,29 @@ namespace SharpWeb.Browsers
             string book_path = Environment.GetFolderPath(Environment.SpecialFolder.Favorites);
 
             string[] files = Directory.GetFiles(book_path, "*.url", SearchOption.AllDirectories);
-            
-            List<string[]> data = new List<string[]> { new string[] { "URL", "TITLE" } };
-            string fileName = Path.Combine("out", "IE_bookmark.csv");
+
+            string[] header = new string[] { "URL", "TITLE" };
+            List<string[]> data = new List<string[]> { };
+
+            string fileName = Path.Combine("out", "IE_bookmark");
             PrintVerbose("Get IE bookmark");
             foreach (string url_file_path in files)
             {
                 if (File.Exists(url_file_path) == true)
                 {
-                    
+
                     string booktext = File.ReadAllText(url_file_path);
                     Match match = Regex.Match(booktext, @"URL=(.*?)\n");
-                    PrintSuccess(url_file_path,1);
-                    PrintSuccess(match.Value,1);
-                    data.Add(new string[] { match.Value ,url_file_path});
+                    PrintSuccess(url_file_path, 1);
+                    PrintSuccess(match.Value, 1);
+                    data.Add(new string[] { match.Value, url_file_path });
                 }
-       
+
             }
-            WriteCSV(data, fileName);
+            if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                WriteJson(header, data, fileName);
+            else
+                WriteCSV(header, data, fileName);
             Console.WriteLine();
         }
 
@@ -79,9 +93,11 @@ namespace SharpWeb.Browsers
         {
             try
             {
-                List<string[]> data = new List<string[]> { new string[] { "Vault Type", "Resource", "Identity", "Credential", "LastModified", "PacakgeSid" } };
+                string[] header = new string[] { "Vault Type", "Resource", "Identity", "Credential", "LastModified", "PacakgeSid" };
+                List<string[]> data = new List<string[]> { };
+
                 List<string> vs = new List<string> { };
-                string fileName = Path.Combine("out", "IE_password.csv");
+                string fileName = Path.Combine("out", "IE_password");
                 PrintVerbose("Get IE Credential");
 
                 var OSVersion = Environment.OSVersion.Version;
@@ -174,9 +190,9 @@ namespace SharpWeb.Browsers
                 vaultSchema.Add(new Guid("3E0E35BE-1B77-43E7-B873-AED901B6275B"), "Windows Domain Password Credential");
                 vaultSchema.Add(new Guid("3C886FF3-2669-4AA2-A8FB-3F6759A77548"), "Windows Extended Credential");
                 vaultSchema.Add(new Guid("00000000-0000-0000-0000-000000000000"), null);
-                
-                
-                
+
+
+
                 for (int i = 0; i < vaultCount; i++)
                 {
                     // Open vault block
@@ -259,7 +275,7 @@ namespace SharpWeb.Browsers
                             }
                             if (cred != null) // Indicates successful fetch
                             {
-                                
+
 
                                 PrintSuccess(String.Format("Vault Type: {0}", vaultType), 1);
                                 vs.Add(vaultType);
@@ -292,12 +308,15 @@ namespace SharpWeb.Browsers
                         }
                     }
                 }
-                WriteCSV(data, fileName);
+                if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                    WriteJson(header, data, fileName);
+                else
+                    WriteCSV(header, data, fileName);
                 Console.WriteLine();
             }
             catch
             {
-               
+
             }
         }
 
