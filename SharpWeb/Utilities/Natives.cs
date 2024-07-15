@@ -75,6 +75,9 @@ namespace SharpWeb.Utilities
 
         [DllImport("vaultcli.dll", EntryPoint = "VaultGetItem")]
         public extern static Int32 VaultGetItem_WIN7(IntPtr vaultHandle, ref Guid schemaId, IntPtr pResourceElement, IntPtr pIdentityElement, IntPtr zero, Int32 arg5, ref IntPtr passwordVaultPtr);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern bool CopyFile(string lpExistingFileName, string lpNewFileName, bool bFailIfExists);
     }
 
 

@@ -72,6 +72,7 @@
     <Compile Include="Utilities\Natives.cs" />
     <Compile Include="Utilities\Struct.cs" />
     <Compile Include="Utilities\Time.cs" />
+    <Compile Include="Utilities\Vsscopy.cs" />
     <Compile Include="Utilities\Zip.cs" />
   </ItemGroup>
   <ItemGroup>

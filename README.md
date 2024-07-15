@@ -72,9 +72,13 @@ By @lele8
 
 ## 新增功能
 
-1.支持cookie导出json格式，可一键导入EditThisCookie插件
+1.支持cookie导出json格式，可一键导入EditThisCookie插件；
 
-2.指定基于Chromium内核的浏览器导出Cookie
+2.指定基于Chromium内核的浏览器导出Cookie；
+
+3.当Chrome或Edge等浏览器运行时复制不了Cookies，使用管理员权限进行卷影复制；
+
+<img src="img/vsscopy.png" alt="vsscopy">
 
 ## 免责声明
 

