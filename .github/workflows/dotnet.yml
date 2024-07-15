@@ -1,0 +1,55 @@
+name: Build SharpWeb
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        configuration: [Release]
+
+    runs-on: windows-2019
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.0.2
+
+    - name: Install NuGet Packages
+      run: nuget restore SharpWeb.sln
+      shell: cmd
+
+    - name: Build solution
+      run: msbuild -nologo -v:m -p:Configuration=${{ matrix.configuration }} SharpWeb.sln
+      shell: cmd
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: AutoBuild
+        release_name: AutoBuild
+        body: ${{ steps.changelog.outputs.changelog }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Exe
+      id: upload-release-exe 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./SharpWeb/bin/Release/SharpWeb.exe
+        asset_name: SharpWeb.exe
+        asset_content_type: application/octet-stream
