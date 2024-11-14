@@ -11,7 +11,6 @@
     <a href="https://github.com/StarfireLab/SharpWeb"><img alt="Forks" src="https://img.shields.io/github/forks/StarfireLab/SharpWeb"></a>
   <a href="https://github.com/StarfireLab/SharpWeb"><img alt="Stars" src="https://img.shields.io/github/stars/StarfireLab/SharpWeb.svg?style=social&label=Stars"></a>
      <a href="https://github.com/lele8"><img alt="Visitor" src="https://visitor-badge.laobi.icu/badge?page_id=StarfireLab.SharpWeb"></a>
-
 ## 浏览器支持情况
 
 | 浏览器                | 密码  | Cookie | 书签  | 历史记录 |
@@ -20,14 +19,14 @@
 | Google Chrome Beta |  ✅  |   ✅    |  ✅  |  ✅   |
 | Chromium           |  ✅  |   ✅    |  ✅  |  ✅   |
 | Microsoft Edge     |  ✅  |   ✅    |  ✅  |  ✅   |
-| 360 极速浏览器          |  ✅  |   ✅    |  ✅  |  ✅   |
+| 360 极速浏览器          |  ✅  |  ✅  |  ✅  | ❌ |
 | QQ                 |  ✅  |   ✅    |  ✅  |  ✅   |
 | Brave              |  ✅  |   ✅    |  ✅  |  ✅   |
 | Opera              |  ✅  |   ✅    |  ✅  |  ✅   |
-| OperaGX            |  ✅  |   ✅    |  ✅  |  ✅   |
-| Vivaldi            |  ✅  |   ✅    |  ✅  |  ✅   |
-| Yandex             |  ✅  |   ✅    |  ✅  |  ✅   |
-| CocCoc             |  ✅  |   ✅    |  ✅  |  ✅   |
+| OperaGX            |  ✅  |   ✅   |  ✅  |  ✅   |
+| Vivaldi            |  ✅  |  ✅  |  ✅  | ✅ |
+| Yandex             |  ❌  |  ✅  |  ✅  | ✅ |
+| CocCoc             |  ✅  |  ✅  |  ✅  | ✅ |
 | Firefox            |  ✅  |   ✅    |  ✅  |  ✅   |
 | Firefox Beta       |  ✅  |   ✅    |  ✅  |  ✅   |
 | Firefox Dev        |  ✅  |   ✅    |  ✅  |  ✅   |
@@ -47,27 +46,27 @@
  ___/ / / / / /_/ / /  / /_/ / |/ |/ /  __/ /_/ /
 /____/_/ /_/\__,_/_/  / .___/|__/|__/\___/_.___/
                      /_/
-
+                                      V:2.1
 
 Export all browingdata(password/cookie/history/download/bookmark) from browser
 By @lele8
 
-  -all           Obtain all browser data
-  -b             Available browsers: chromium/firefox/ie
-  -p             Custom profile dir path or the path of Cookies
-  -s             Specify the path of Local State
-  -show          Output the results on the command line
-  -zip           Compress result to zip (default: false)
-  -format        Export to CSV (default) or JSON format
+              -all           Obtain all browser data
+              -b             Available browsers: chromium/firefox/ie
+              -p             Custom profile dir path or the path of Cookies
+              -s             Specify the path of Local State
+              -show          Output the results on the command line
+              -zip           Compress result to zip (default: false)
+              -format        Export to CSV (default) or JSON format
 
-  Usage:
-       SharpWeb.exe -all
-       SharpWeb.exe -all -zip
-       SharpWeb.exe -all -show
-       SharpWeb.exe -all -format json
-       SharpWeb.exe -b firefox
-       SharpWeb.exe -b chromium -p "C:\Users\test\AppData\Local\Google\Chrome\User Data\Default"
-       SharpWeb.exe -b chromium -p "C:\Users\test\AppData\Local\Google\Chrome\User Data\Default\Network\Cookies" -s "C:\Users\test\AppData\Local\Google\Chrome\User Data\Local State"
+              Usage:
+                   SharpWeb.exe -all
+                   SharpWeb.exe -all -zip
+                   SharpWeb.exe -all -show
+                   SharpWeb.exe -all -format json
+                   SharpWeb.exe -b firefox
+                   SharpWeb.exe -b chromium -p "C:\Users\test\AppData\Local\Google\Chrome\User Data\Default"
+                   SharpWeb.exe -b chromium -p "C:\Users\test\AppData\Local\Google\Chrome\User Data\Default\Network\Cookies" -s "C:\Users\test\AppData\Local\Google\Chrome\User Data\Local State"
 ```
 
 ## 新增功能
@@ -76,9 +75,9 @@ By @lele8
 
 2.指定基于Chromium内核的浏览器导出Cookie；
 
-3.当Chrome或Edge等浏览器运行时复制不了Cookies，使用管理员权限进行卷影复制；
+3.去掉依赖第三方的SQLite，使用代码进行实现读取，减小体积；
 
-<img src="img/vsscopy.png" alt="vsscopy">
+4.支持最新版chromium内核浏览器Cookie解密(需管理员权限)；
 
 ## 免责声明
 

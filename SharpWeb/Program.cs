@@ -1,5 +1,7 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
+using System.Text;
 using SharpWeb.Utilities;
 using static SharpWeb.Browsers.Chromium;
 using static SharpWeb.Browsers.FireFox;
@@ -21,7 +23,7 @@ namespace SharpWeb
  ___/ / / / / /_/ / /  / /_/ / |/ |/ /  __/ /_/ /
 /____/_/ /_/\__,_/_/  / .___/|__/|__/\___/_.___/ 
                      /_/                         
-                                        
+                                      V:2.1     
 ");
         }
 
@@ -73,23 +75,23 @@ namespace SharpWeb
                 Console.WriteLine(@"Export all browingdata(password/cookie/history/download/bookmark) from browser
 By @lele8
 
-  -all           Obtain all browser data
-  -b             Available browsers: chromium/firefox/ie
-  -p             Custom profile dir path or the path of Cookies
-  -s             Specify the path of Local State
-  -show          Output the results on the command line
-  -zip           Compress result to zip (default: false)
-  -format        Export to CSV (default) or JSON format
+              -all           Obtain all browser data
+              -b             Available browsers: chromium/firefox/ie
+              -p             Custom profile dir path or the path of Cookies
+              -s             Specify the path of Local State
+              -show          Output the results on the command line
+              -zip           Compress result to zip (default: false)
+              -format        Export to CSV (default) or JSON format
 
-  Usage: 
-       SharpWeb.exe -all
-       SharpWeb.exe -all -zip
-       SharpWeb.exe -all -show
-       SharpWeb.exe -all -format json
-       SharpWeb.exe -b firefox
-       SharpWeb.exe -b chromium -p ""C:\Users\test\AppData\Local\Google\Chrome\User Data\Default""
-       SharpWeb.exe -b chromium -p ""C:\Users\test\AppData\Local\Google\Chrome\User Data\Default\Network\Cookies"" -s ""C:\Users\test\AppData\Local\Google\Chrome\User Data\Local State""
-");
+              Usage: 
+                   SharpWeb.exe -all
+                   SharpWeb.exe -all -zip
+                   SharpWeb.exe -all -show
+                   SharpWeb.exe -all -format json
+                   SharpWeb.exe -b firefox
+                   SharpWeb.exe -b chromium -p ""C:\Users\test\AppData\Local\Google\Chrome\User Data\Default""
+                   SharpWeb.exe -b chromium -p ""C:\Users\test\AppData\Local\Google\Chrome\User Data\Default\Network\Cookies"" -s ""C:\Users\test\AppData\Local\Google\Chrome\User Data\Local State""
+            ");
             }
             else if (!string.IsNullOrEmpty(argBrowsers))
             {
@@ -120,9 +122,28 @@ By @lele8
                 Chromium_kernel();
                 GetFireFox();
                 GetIE();
-            }
+            }            
             if (aZip)
-                Zip.saveZip();
-        }
+            {
+                string name = "out";
+                string sourceFolder = String.Format("{0}\\{1}", System.IO.Directory.GetCurrentDirectory(), name);
+                string zipFile = String.Format("{0}\\{1}.zip", System.IO.Directory.GetCurrentDirectory(), name);
+                //Zip
+                using (ZipStorer zip = ZipStorer.Create(zipFile))
+                {
+                    foreach (var directory in Directory.GetDirectories(sourceFolder, "*", SearchOption.AllDirectories))
+                    {
+                        string relativePath = directory.Substring(sourceFolder.Length + 1);
+                        zip.AddDirectory(ZipStorer.Compression.Deflate, directory, relativePath);
+                    }
+                    foreach (var file in Directory.GetFiles(sourceFolder, "*.*", SearchOption.AllDirectories))
+                    {
+                        string relativePath = file.Substring(sourceFolder.Length + 1);
+                        zip.AddFile(ZipStorer.Compression.Deflate, file, relativePath);
+                    }
+                }
+                Directory.Delete(sourceFolder, true);
+            }
+        } 
     }
 }

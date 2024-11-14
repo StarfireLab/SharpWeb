@@ -2,9 +2,7 @@
 using System.Text;
 using System.Security.Cryptography;
 using System.IO;
-using System.Runtime.InteropServices;
-using static SharpWeb.Utilities.Natives;
-using static SharpWeb.Utilities.Struct;
+using System.Linq;
 
 namespace SharpWeb.Browsers
 {
@@ -13,197 +11,126 @@ namespace SharpWeb.Browsers
     {
         public static byte[] GetMasterKey(string filePath)
         {
-            //Key saved in Local State file
-
             byte[] masterKey = new byte[] { };
-
-            if (File.Exists(filePath) == false)
+            if (!File.Exists(filePath))
                 return null;
-
-            //Get key with regex.
-            var pattern = new System.Text.RegularExpressions.Regex("\"encrypted_key\":\"(.*?)\"", System.Text.RegularExpressions.RegexOptions.Compiled).Matches(File.ReadAllText(filePath));
-
+            var pattern = new System.Text.RegularExpressions.Regex("\"encrypted_key\":\"(.*?)\"", System.Text.RegularExpressions.RegexOptions.Compiled).Matches(File.ReadAllText(filePath).Replace(" ", ""));
             foreach (System.Text.RegularExpressions.Match prof in pattern)
             {
                 if (prof.Success)
-                    masterKey = Convert.FromBase64String((prof.Groups[1].Value)); //Decode base64
+                    masterKey = Convert.FromBase64String((prof.Groups[1].Value));
             }
-
-            //Trim first 5 bytes. Its signature "DPAPI"
             byte[] temp = new byte[masterKey.Length - 5];
             Array.Copy(masterKey, 5, temp, 0, masterKey.Length - 5);
-
             try
             {
                 return ProtectedData.Unprotect(temp, null, DataProtectionScope.CurrentUser);
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine(ex.ToString());
                 return null;
             }
         }
 
-        public static string DecryptWithKey(byte[] encryptedData, byte[] MasterKey)
+
+        public static string DecryptData(byte[] buffer, byte[] MasterKey)
         {
-            byte[] iv = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // IV 12 bytes
-
-            //trim first 3 bytes(signature "v10") and take 12 bytes after signature.
-            Array.Copy(encryptedData, 3, iv, 0, 12);
-
+            byte[] decryptedData = null;
+            if (MasterKey is null) 
+                return null;
             try
             {
-                //encryptedData without IV
-                byte[] Buffer = new byte[encryptedData.Length - 15];
-                Array.Copy(encryptedData, 15, Buffer, 0, encryptedData.Length - 15);
+                string bufferString = Encoding.UTF8.GetString(buffer);
+                if (bufferString.StartsWith("v10") || bufferString.StartsWith("v11"))
+                {
+                    byte[] iv = new byte[12];
+                    Array.Copy(buffer, 3, iv, 0, 12);
+                    byte[] cipherText = new byte[buffer.Length - 15];
+                    Array.Copy(buffer, 15, cipherText, 0, buffer.Length - 15);
+                    byte[] tag = new byte[16];
+                    Array.Copy(cipherText, cipherText.Length - 16, tag, 0, 16);
+                    byte[] data = new byte[cipherText.Length - tag.Length];
+                    Array.Copy(cipherText, 0, data, 0, cipherText.Length - tag.Length);
+                    decryptedData = new AesGcm().Decrypt(MasterKey, iv, null, data, tag);
+                }
+                else
+                {
+                    decryptedData = ProtectedData.Unprotect(buffer, null, DataProtectionScope.CurrentUser);
+                }
+            }
+            catch 
+            {
+                return null;
+            }
 
-                byte[] tag = new byte[16]; //AuthTag
-                byte[] data = new byte[Buffer.Length - tag.Length]; //Encrypted Data
+            var result = Encoding.UTF8.GetString(decryptedData);
 
-                //Last 16 bytes for tag
-                Array.Copy(Buffer, Buffer.Length - 16, tag, 0, 16);
+            return result;
+        }
 
-                //encrypted password
-                Array.Copy(Buffer, 0, data, 0, Buffer.Length - tag.Length);
-
-                AesGcm aesDecryptor = new AesGcm();
-                var result = Encoding.UTF8.GetString(aesDecryptor.Decrypt(MasterKey, iv, null, data, tag));
-
+        public static byte[] RemoveAppBPrefix(byte[] encryptedKey)
+        {
+            if (encryptedKey.Length >= 4 && encryptedKey[0] == 0x41 && encryptedKey[1] == 0x50 && encryptedKey[2] == 0x50 && encryptedKey[3] == 0x42)
+            {
+                byte[] result = new byte[encryptedKey.Length - 4];
+                Array.Copy(encryptedKey, 4, result, 0, encryptedKey.Length - 4);
                 return result;
             }
-            catch (Exception ex)
+            else
             {
-                Console.WriteLine(ex.ToString());
                 return null;
             }
         }
-    }
 
-    //AES GCM from https://github.com/dvsekhvalnov/jose-jwt
-    class AesGcm
-    {
-        public byte[] Decrypt(byte[] key, byte[] iv, byte[] aad, byte[] cipherText, byte[] authTag)
+
+        public static byte[] DecryptWithSystemDPAPI(string fullPath)
         {
-            IntPtr hAlg = OpenAlgorithmProvider(BCRYPT_AES_ALGORITHM, MS_PRIMITIVE_PROVIDER, BCRYPT_CHAIN_MODE_GCM);
-            IntPtr hKey, keyDataBuffer = ImportKey(hAlg, key, out hKey);
-
-            byte[] plainText;
-
-            var authInfo = new BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO(iv, aad, authTag);
-            using (authInfo)
+            try
             {
-                byte[] ivData = new byte[MaxAuthTagSize(hAlg)];
-
-                int plainTextSize = 0;
-
-                uint status = BCryptDecrypt(hKey, cipherText, cipherText.Length, ref authInfo, ivData, ivData.Length, null, 0, ref plainTextSize, 0x0);
-
-                if (status != ERROR_SUCCESS)
-                    throw new CryptographicException(string.Format("BCryptDecrypt() (get size) failed with status code: {0}", status));
-
-                plainText = new byte[plainTextSize];
-
-                status = BCryptDecrypt(hKey, cipherText, cipherText.Length, ref authInfo, ivData, ivData.Length, plainText, plainText.Length, ref plainTextSize, 0x0);
-
-                if (status == STATUS_AUTH_TAG_MISMATCH)
-                    throw new CryptographicException("BCryptDecrypt(): authentication tag mismatch");
-
-                if (status != ERROR_SUCCESS)
-                    throw new CryptographicException(string.Format("BCryptDecrypt() failed with status code:{0}", status));
+                byte[] base64EncryptedKey = null;
+                var pattern = new System.Text.RegularExpressions.Regex("\"app_bound_encrypted_key\":\"(.*?)\"", System.Text.RegularExpressions.RegexOptions.Compiled).Matches(File.ReadAllText(fullPath).Replace(" ", ""));
+                foreach (System.Text.RegularExpressions.Match prof in pattern)
+                {
+                    if (prof.Success)
+                        base64EncryptedKey = Convert.FromBase64String((prof.Groups[1].Value));
+                }
+                byte[] Key = ProtectedData.Unprotect(RemoveAppBPrefix(base64EncryptedKey), null, DataProtectionScope.LocalMachine);
+                return Key;
             }
-
-            BCryptDestroyKey(hKey);
-            Marshal.FreeHGlobal(keyDataBuffer);
-            BCryptCloseAlgorithmProvider(hAlg, 0x0);
-
-            return plainText;
-        }
-
-        private int MaxAuthTagSize(IntPtr hAlg)
-        {
-            byte[] tagLengthsValue = GetProperty(hAlg, BCRYPT_AUTH_TAG_LENGTH);
-
-            return BitConverter.ToInt32(new[] { tagLengthsValue[4], tagLengthsValue[5], tagLengthsValue[6], tagLengthsValue[7] }, 0);
-        }
-
-        private IntPtr OpenAlgorithmProvider(string alg, string provider, string chainingMode)
-        {
-            IntPtr hAlg = IntPtr.Zero;
-
-            uint status = BCryptOpenAlgorithmProvider(out hAlg, alg, provider, 0x0);
-
-            if (status != ERROR_SUCCESS)
-                throw new CryptographicException(string.Format("BCryptOpenAlgorithmProvider() failed with status code:{0}", status));
-
-            byte[] chainMode = Encoding.Unicode.GetBytes(chainingMode);
-            status = BCryptSetAlgorithmProperty(hAlg, BCRYPT_CHAINING_MODE, chainMode, chainMode.Length, 0x0);
-
-            if (status != ERROR_SUCCESS)
-                throw new CryptographicException(string.Format("BCryptSetAlgorithmProperty(BCRYPT_CHAINING_MODE, BCRYPT_CHAIN_MODE_GCM) failed with status code:{0}", status));
-
-            return hAlg;
-        }
-
-        private IntPtr ImportKey(IntPtr hAlg, byte[] key, out IntPtr hKey)
-        {
-            byte[] objLength = GetProperty(hAlg, BCRYPT_OBJECT_LENGTH);
-
-            int keyDataSize = BitConverter.ToInt32(objLength, 0);
-
-            IntPtr keyDataBuffer = Marshal.AllocHGlobal(keyDataSize);
-
-            byte[] keyBlob = Concat(BCRYPT_KEY_DATA_BLOB_MAGIC, BitConverter.GetBytes(0x1), BitConverter.GetBytes(key.Length), key);
-
-            uint status = BCryptImportKey(hAlg, IntPtr.Zero, BCRYPT_KEY_DATA_BLOB, out hKey, keyDataBuffer, keyDataSize, keyBlob, keyBlob.Length, 0x0);
-
-            if (status != ERROR_SUCCESS)
-                throw new CryptographicException(string.Format("BCryptImportKey() failed with status code:{0}", status));
-
-            return keyDataBuffer;
-        }
-
-        private byte[] GetProperty(IntPtr hAlg, string name)
-        {
-            int size = 0;
-
-            uint status = BCryptGetProperty(hAlg, name, null, 0, ref size, 0x0);
-
-            if (status != ERROR_SUCCESS)
-                throw new CryptographicException(string.Format("BCryptGetProperty() (get size) failed with status code:{0}", status));
-
-            byte[] value = new byte[size];
-
-            status = BCryptGetProperty(hAlg, name, value, value.Length, ref size, 0x0);
-
-            if (status != ERROR_SUCCESS)
-                throw new CryptographicException(string.Format("BCryptGetProperty() failed with status code:{0}", status));
-
-            return value;
-        }
-
-        public byte[] Concat(params byte[][] arrays)
-        {
-            int len = 0;
-
-            foreach (byte[] array in arrays)
+            catch
             {
-                if (array == null)
-                    continue;
-                len += array.Length;
+                return null;
             }
-
-            byte[] result = new byte[len - 1 + 1];
-            int offset = 0;
-
-            foreach (byte[] array in arrays)
+        }
+        //add from to https://github.com/runassu/chrome_v20_decryption/blob/main/decrypt_chrome_v20_cookie.py
+        public static byte[] DecryptWithUserDPAPI(byte[] SystemKey, string file)
+        {
+            try
             {
-                if (array == null)
-                    continue;
-                Buffer.BlockCopy(array, 0, result, offset, array.Length);
-                offset += array.Length;
+                byte[] Key1 = ProtectedData.Unprotect(SystemKey, null, DataProtectionScope.CurrentUser);
+                byte[] Key2 = Key1.Skip(Math.Max(0, Key1.Length - 61)).ToArray();
+                byte[] decryptedData = null;
+                if (file.Contains("Google"))
+                {
+                    string aesKeyBase64 = "sxxuJBrIRnKNqcH6xJNmUc/7lE0UOrgWJ2vMbaAoR4c=";
+                    byte[] aesKey = Convert.FromBase64String(aesKeyBase64);
+                    byte[] iv = Key2.Skip(1).Take(12).ToArray();
+                    byte[] ciphertext = Key2.Skip(13).Take(32).ToArray();
+                    byte[] tag = Key2.Skip(45).Take(16).ToArray();
+                    decryptedData = new AesGcm().Decrypt(aesKey, iv, null, ciphertext, tag);
+                }
+                else
+                {
+                    byte[] key = new byte[32];
+                    Array.Copy(Key1, Key1.Length - 32, key, 0, 32);
+                    decryptedData = key;
+                }
+                return decryptedData;
             }
-
-            return result;
+            catch
+            {
+                return null;
+            }
         }
     }
 }

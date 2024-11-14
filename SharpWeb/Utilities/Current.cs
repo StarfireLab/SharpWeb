@@ -82,24 +82,6 @@ namespace SharpWeb.Utilities
             }
         }
 
-        public static string PatchWALDatabase(string tempDBFile)
-        {
-            // I couldn't figure out a safe way to open WAL enabled sqlite DBs (https://github.com/metacore/csharp-sqlite/issues/112)
-            // So we'll "patch" temporary DB files we're reading to disable WAL journaling
-            // Patch idea from here (https://stackoverflow.com/a/5476850)
-            // WARNING - Don't use this patch on live/production sqlite DB files, always create temp duplicates first then patch the copy
-            var offsets = new List<int> { 0x12, 0x13 };
-
-            foreach (var n in offsets)
-
-                using (var fs = new FileStream(tempDBFile, FileMode.Open, FileAccess.ReadWrite))
-                {
-                    fs.Position = n;
-                    fs.WriteByte(Convert.ToByte(0x1));
-                }
-            return tempDBFile;
-        }
-
         public static void WriteJson(string[] names, List<string[]> values, string filePath)
         {
             try
@@ -225,7 +207,8 @@ namespace SharpWeb.Utilities
                     sameSiteString = "strict";
                     break;
                 default:
-                    throw new Exception($"Unexpected SameSite value {sameSite}");
+                    sameSiteString = "null";
+                    break;
             }
             return sameSiteString;
         }

